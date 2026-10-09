@@ -16,7 +16,7 @@
 
 import { GoogleGenAI } from "@google/genai";
 import { writeFile, mkdir, readFile } from "fs/promises";
-import { join, extname, basename, dirname } from "path";
+import { join, extname, basename, dirname, resolve } from "path";
 import { existsSync, readFileSync } from "fs";
 import { spawn } from "child_process";
 import { fileURLToPath } from "url";
@@ -126,9 +126,7 @@ function getMimeType(filePath: string): string {
 async function loadImageAsBase64(
   filePath: string
 ): Promise<{ data: string; mimeType: string }> {
-  const absolutePath = filePath.startsWith("/")
-    ? filePath
-    : join(process.cwd(), filePath);
+  const absolutePath = resolve(filePath);
 
   if (!existsSync(absolutePath)) {
     throw new Error(`Image not found: ${absolutePath}`);
@@ -292,7 +290,7 @@ async function detectKeyColor(inputPath: string): Promise<string> {
 }
 
 async function removeBackground(inputPath: string): Promise<string> {
-  const dir = inputPath.substring(0, inputPath.lastIndexOf("/"));
+  const dir = dirname(inputPath);
   const name = basename(inputPath, extname(inputPath));
   const outputPath = join(dir, `${name}.png`);
   const tempKeyed = join(dir, `${name}_keyed.png`);

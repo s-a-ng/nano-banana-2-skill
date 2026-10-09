@@ -1,6 +1,8 @@
 # Nano Banana 2 Skill
 
 > Fork of [kingbootoshi/nano-banana-2-skill](https://github.com/kingbootoshi/nano-banana-2-skill) that adds **OpenRouter** as a backend (pay by card or USDC, no Google billing account needed) and defaults to **Nano Banana 2.1**.
+>
+> **New here? Follow the step-by-step [Linux and Windows setup tutorial](TUTORIAL.md).**
 
 AI image generation CLI powered by Nano Banana 2.1 (default) with support for Gemini 3.1 Flash, Gemini 3 Pro and any Gemini model. Multi-resolution (512-4K), aspect ratios, cost tracking, broadcast-grade green screen transparency, reference images, and style transfer.
 
