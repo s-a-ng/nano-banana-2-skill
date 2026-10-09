@@ -1,6 +1,8 @@
 # Nano Banana 2 Skill
 
-AI image generation CLI powered by Gemini 3.1 Flash Image Preview (default) with support for Gemini 3 Pro and any Gemini model. Multi-resolution (512-4K), aspect ratios, cost tracking, broadcast-grade green screen transparency, reference images, and style transfer.
+> Fork of [kingbootoshi/nano-banana-2-skill](https://github.com/kingbootoshi/nano-banana-2-skill) that adds **OpenRouter** as a backend (pay by card or USDC, no Google billing account needed) and defaults to **Nano Banana 2.1**.
+
+AI image generation CLI powered by Nano Banana 2.1 (default) with support for Gemini 3.1 Flash, Gemini 3 Pro and any Gemini model. Multi-resolution (512-4K), aspect ratios, cost tracking, broadcast-grade green screen transparency, reference images, and style transfer.
 
 Also ships as a [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skill for AI-assisted image generation workflows.
 
@@ -10,7 +12,7 @@ Also ships as a [Claude Code](https://docs.anthropic.com/en/docs/claude-code) sk
 
 ```bash
 # Clone the repo
-git clone https://github.com/kingbootoshi/nano-banana-2-skill.git ~/tools/nano-banana-2
+git clone https://github.com/s-a-ng/nano-banana-2-skill.git ~/tools/nano-banana-2
 cd ~/tools/nano-banana-2
 
 # Install dependencies
@@ -19,12 +21,12 @@ bun install
 # Link globally (no sudo needed - uses Bun's global bin)
 bun link
 
-# Set up your API key
+# Set up your API key (OpenRouter, or GEMINI_API_KEY for Google directly)
 mkdir -p ~/.nano-banana
-echo "GEMINI_API_KEY=your_key_here" > ~/.nano-banana/.env
+echo "OPENROUTER_API_KEY=your_key_here" > ~/.nano-banana/.env
 ```
 
-Get a Gemini API key at [Google AI Studio](https://aistudio.google.com/apikey).
+Get an OpenRouter key at [openrouter.ai/settings/keys](https://openrouter.ai/settings/keys) (buy credits at [openrouter.ai/settings/credits](https://openrouter.ai/settings/credits)), or a Gemini API key at [Google AI Studio](https://aistudio.google.com/apikey).
 
 Now you can use `nano-banana` from anywhere.
 
@@ -78,6 +80,7 @@ nano-banana "your prompt" --model gemini-2.5-flash-image
 
 | Alias | Model | Best For |
 |-------|-------|----------|
+| `nb2.1` | Nano Banana 2.1 (default) | Cheapest: ~$0.034/1K, ~$0.050/2K, ~$0.113/4K |
 | `flash`, `nb2` | Gemini 3.1 Flash Image Preview | Speed, cost, high-volume |
 | `pro`, `nb-pro` | Gemini 3 Pro Image Preview | Highest quality, complex composition |
 
@@ -177,10 +180,10 @@ Shows total generations, total spend, and per-model breakdown.
 
 ## API Key Configuration
 
-The CLI resolves the Gemini API key in priority order:
+The CLI resolves the API key in priority order. Keys starting with `sk-or-` are sent to OpenRouter (without Google Search grounding, which OpenRouter bills per request); anything else goes to the Gemini API.
 
 1. `--api-key` flag on the command line
-2. `GEMINI_API_KEY` environment variable
+2. `GEMINI_API_KEY`, then `OPENROUTER_API_KEY` environment variable
 3. `.env` file in the current working directory
 4. `.env` file in the repo root (next to `src/`)
 5. `~/.nano-banana/.env`

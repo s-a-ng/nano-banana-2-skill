@@ -1,11 +1,11 @@
 ---
 name: nano-banana
-description: Generates AI images using the nano-banana CLI (Gemini 3.1 Flash default, Pro available). Handles multi-resolution (512-4K), aspect ratios, reference images for style transfer, green screen workflow for transparent assets, cost tracking, and exact dimension control. Use when asked to "generate an image", "create a sprite", "make an asset", "generate artwork", or any image generation task for UI mockups, game assets, videos, or marketing materials.
+description: Generates AI images using the nano-banana CLI (Nano Banana 2.1 default, Flash and Pro available; Gemini API or OpenRouter key). Handles multi-resolution (512-4K), aspect ratios, reference images for style transfer, green screen workflow for transparent assets, cost tracking, and exact dimension control. Use when asked to "generate an image", "create a sprite", "make an asset", "generate artwork", or any image generation task for UI mockups, game assets, videos, or marketing materials.
 ---
 
 # nano-banana
 
-AI image generation CLI. Default model: Gemini 3.1 Flash Image Preview (Nano Banana 2).
+AI image generation CLI. Default model: Nano Banana 2.1. Works with a Gemini API key or an OpenRouter key.
 
 ## /init - First-Time Setup
 
@@ -15,7 +15,7 @@ When the user says "init", "setup nano-banana", or "install nano-banana", run th
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/kingbootoshi/nano-banana-2-skill.git ~/tools/nano-banana-2
+git clone https://github.com/s-a-ng/nano-banana-2-skill.git ~/tools/nano-banana-2
 
 # 2. Install dependencies
 cd ~/tools/nano-banana-2 && bun install
@@ -23,9 +23,9 @@ cd ~/tools/nano-banana-2 && bun install
 # 3. Link globally (creates `nano-banana` command via Bun - no sudo)
 cd ~/tools/nano-banana-2 && bun link
 
-# 4. Set up API key
+# 4. Set up API key (OpenRouter key starts with sk-or-; otherwise use GEMINI_API_KEY)
 mkdir -p ~/.nano-banana
-echo "GEMINI_API_KEY=<ask user for their key>" > ~/.nano-banana/.env
+echo "OPENROUTER_API_KEY=<ask user for their key>" > ~/.nano-banana/.env
 ```
 
 After init, the user can type `nano-banana "prompt"` from anywhere.
@@ -39,12 +39,12 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
 source ~/.zshrc
 ```
 
-Get a Gemini API key at: https://aistudio.google.com/apikey
+Get an OpenRouter key at https://openrouter.ai/settings/keys or a Gemini API key at https://aistudio.google.com/apikey
 
 ## Quick Reference
 
 - Command: `nano-banana "prompt" [options]`
-- Default: 1K resolution, Flash model, current directory
+- Default: 1K resolution, Nano Banana 2.1, current directory
 
 ## Core Options
 
@@ -53,18 +53,19 @@ Get a Gemini API key at: https://aistudio.google.com/apikey
 | `-o, --output` | `nano-gen-{timestamp}` | Output filename (no extension) |
 | `-s, --size` | `1K` | Image size: `512`, `1K`, `2K`, or `4K` |
 | `-a, --aspect` | model default | Aspect ratio: `1:1`, `16:9`, `9:16`, `4:3`, `3:4`, etc. |
-| `-m, --model` | `flash` | Model: `flash`/`nb2`, `pro`/`nb-pro`, or any model ID |
+| `-m, --model` | `nb2.1` | Model: `nb2.1`, `flash`/`nb2`, `pro`/`nb-pro`, or any model ID |
 | `-d, --dir` | current directory | Output directory |
 | `-r, --ref` | - | Reference image (can use multiple times) |
 | `-t, --transparent` | - | Generate on green screen, remove background (FFmpeg) |
-| `--api-key` | - | Gemini API key (overrides env/file) |
+| `--api-key` | - | Gemini or OpenRouter (`sk-or-...`) key (overrides env/file) |
 | `--costs` | - | Show cost summary |
 
 ## Models
 
 | Alias | Model | Use When |
 |-------|-------|----------|
-| `flash`, `nb2` | Gemini 3.1 Flash | Default. Fast, cheap (~$0.067/1K image) |
+| `nb2.1` | Nano Banana 2.1 | Default. Cheapest (~$0.034/1K, ~$0.050/2K, ~$0.113/4K) |
+| `flash`, `nb2` | Gemini 3.1 Flash | Fast, cheap (~$0.067/1K image) |
 | `pro`, `nb-pro` | Gemini 3 Pro | Highest quality needed (~$0.134/1K image) |
 
 ## Sizes
@@ -186,11 +187,13 @@ nano-banana "mobile app onboarding screen" -a 9:16
 
 ## API Key Setup
 
-The CLI resolves the Gemini API key in this order:
+The CLI resolves the API key in this order:
 1. `--api-key` flag
-2. `GEMINI_API_KEY` environment variable
+2. `GEMINI_API_KEY`, then `OPENROUTER_API_KEY` environment variable
 3. `.env` file in current directory
 4. `.env` file next to the CLI script
 5. `~/.nano-banana/.env`
 
-Get a key at: https://aistudio.google.com/apikey
+Keys starting with `sk-or-` go through OpenRouter (no Google Search grounding there); anything else goes to the Gemini API.
+
+Get a key at https://openrouter.ai/settings/keys or https://aistudio.google.com/apikey

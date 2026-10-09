@@ -1,8 +1,9 @@
 #!/usr/bin/env bun
 /**
  * Nano Banana 2 - AI Image Generation CLI
- * Default: Gemini 3.1 Flash Image Preview (Nano Banana 2)
- * Also supports: Gemini 3 Pro Image Preview (Nano Banana Pro) and any model ID
+ * Default: Nano Banana 2.1
+ * Also supports: Gemini 3.1 Flash Image, Gemini 3 Pro Image (Nano Banana Pro) and any model ID
+ * Backends: Gemini API (GEMINI_API_KEY) or OpenRouter (OPENROUTER_API_KEY)
  *
  * Usage:
  *   nano-banana "your prompt here"
@@ -55,13 +56,14 @@ loadEnvFile(join(homedir(), ".nano-banana", ".env"));
 // ---------------------------------------------------------------------------
 
 const MODEL_ALIASES: Record<string, string> = {
+  "nb2.1": "gemini-nano-banana-2.1",
   flash: "gemini-3.1-flash-image-preview",
   nb2: "gemini-3.1-flash-image-preview",
   pro: "gemini-3-pro-image-preview",
   "nb-pro": "gemini-3-pro-image-preview",
 };
 
-const DEFAULT_MODEL = "gemini-3.1-flash-image-preview";
+const DEFAULT_MODEL = "gemini-nano-banana-2.1";
 
 const VALID_SIZES = ["512", "1K", "2K", "4K"] as const;
 type ImageSize = (typeof VALID_SIZES)[number];
@@ -73,6 +75,7 @@ const VALID_ASPECTS = [
 
 // Cost rates per 1M tokens
 const COST_RATES: Record<string, { input: number; imageOutput: number }> = {
+  "gemini-nano-banana-2.1": { input: 1.5, imageOutput: 30 },
   "gemini-3.1-flash-image-preview": { input: 0.25, imageOutput: 60 },
   "gemini-3-pro-image-preview": { input: 2.0, imageOutput: 120 },
 };
@@ -348,7 +351,7 @@ function parseArgs(): Options | "costs" {
   if (args.length === 0 || args[0] === "--help" || args[0] === "-h") {
     console.log(`
 \x1b[36mNano Banana 2\x1b[0m - AI Image Generation CLI
-Default: Gemini 3.1 Flash Image Preview (Nano Banana 2)
+Default: Nano Banana 2.1
 
 \x1b[33mUsage:\x1b[0m
   nano-banana "your prompt"
@@ -361,16 +364,17 @@ Default: Gemini 3.1 Flash Image Preview (Nano Banana 2)
   -o, --output      Output filename (without extension) [default: nano-gen-{timestamp}]
   -s, --size        Image size: 512, 1K, 2K, or 4K [default: 1K]
   -a, --aspect      Aspect ratio: 1:1, 16:9, 9:16, 4:3, 3:4, etc. [default: model default]
-  -m, --model       Model: flash/nb2, pro/nb-pro, or any model ID [default: flash]
+  -m, --model       Model: nb2.1, flash/nb2, pro/nb-pro, or any model ID [default: nb2.1]
   -d, --dir         Output directory [default: current directory]
   -r, --ref         Reference image(s) - can use multiple times
   -t, --transparent Generate on green screen, then remove background (FFmpeg colorkey + despill)
-  --api-key         Gemini API key (overrides env/file)
+  --api-key         Gemini or OpenRouter (sk-or-...) API key (overrides env/file)
   --costs           Show cost summary from generation history
   -h, --help        Show this help
 
 \x1b[33mModels:\x1b[0m
-  flash, nb2    Gemini 3.1 Flash Image Preview (default, fast, cheap)
+  nb2.1         Nano Banana 2.1 (default, cheapest, ~$0.034/1K image)
+  flash, nb2    Gemini 3.1 Flash Image Preview (fast, cheap)
   pro, nb-pro   Gemini 3 Pro Image Preview (highest quality, 2x cost)
   <model-id>    Any Gemini model ID (e.g. gemini-2.5-flash-image)
 
@@ -400,8 +404,9 @@ Default: Gemini 3.1 Flash Image Preview (Nano Banana 2)
   nano-banana --costs    Show total spend and per-model breakdown
 
 \x1b[33mAPI Key:\x1b[0m
-  Set GEMINI_API_KEY in your environment, a .env file, or pass --api-key.
-  Get a key at: https://aistudio.google.com/apikey
+  Set GEMINI_API_KEY or OPENROUTER_API_KEY in your environment, a .env file, or pass --api-key.
+  Gemini key:     https://aistudio.google.com/apikey
+  OpenRouter key: https://openrouter.ai/settings/keys (pay by card or USDC)
 `);
     process.exit(0);
   }
@@ -476,26 +481,93 @@ Default: Gemini 3.1 Flash Image Preview (Nano Banana 2)
 }
 
 // ---------------------------------------------------------------------------
+// OpenRouter backend
+// ---------------------------------------------------------------------------
+
+// The subset of Gemini's response the CLI reads; OpenRouter replies are reshaped into it
+interface GeminiLikeResponse {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{ text?: string; inlineData?: { data?: string; mimeType?: string } }>;
+    };
+  }>;
+  usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; cost?: number };
+}
+
+async function generateViaOpenRouter(
+  apiKey: string,
+  model: string,
+  parts: Array<{ text: string } | { inlineData: { data: string; mimeType: string } }>,
+  imageConfig: Record<string, string>
+): Promise<GeminiLikeResponse> {
+  const content = parts.map((p) =>
+    "text" in p
+      ? { type: "text", text: p.text }
+      : {
+          type: "image_url",
+          image_url: { url: `data:${p.inlineData.mimeType};base64,${p.inlineData.data}` },
+        }
+  );
+
+  // Google Search grounding is skipped here: OpenRouter bills web search per request
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: model.includes("/") ? model : `google/${model}`,
+      messages: [{ role: "user", content }],
+      modalities: ["image", "text"],
+      image_config: { image_size: imageConfig.imageSize, aspect_ratio: imageConfig.aspectRatio },
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`OpenRouter ${res.status}: ${await res.text()}`);
+  }
+
+  const json = await res.json();
+  const message = json.choices?.[0]?.message ?? {};
+  const outParts: Array<{ text?: string; inlineData?: { data: string; mimeType: string } }> = [];
+  if (message.content) outParts.push({ text: message.content });
+  for (const img of message.images ?? []) {
+    const match = /^data:([^;]+);base64,(.*)$/s.exec(img.image_url?.url ?? "");
+    if (!match) throw new Error("OpenRouter returned an image that is not a base64 data URL");
+    outParts.push({ inlineData: { mimeType: match[1], data: match[2] } });
+  }
+
+  return {
+    candidates: [{ content: { parts: outParts } }],
+    usageMetadata: {
+      promptTokenCount: json.usage?.prompt_tokens,
+      candidatesTokenCount: json.usage?.completion_tokens,
+      cost: json.usage?.cost,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Image generation
 // ---------------------------------------------------------------------------
 
 async function generateImage(options: Options): Promise<string[]> {
-  const apiKey = options.apiKey || process.env.GEMINI_API_KEY;
+  const apiKey =
+    options.apiKey || process.env.GEMINI_API_KEY || process.env.OPENROUTER_API_KEY;
 
   if (!apiKey) {
-    console.error("\x1b[31mError:\x1b[0m GEMINI_API_KEY is required.");
+    console.error("\x1b[31mError:\x1b[0m GEMINI_API_KEY or OPENROUTER_API_KEY is required.");
     console.error("");
     console.error("Set it one of these ways:");
-    console.error("  1. Export:    export GEMINI_API_KEY=your_key");
-    console.error("  2. .env:     Create .env with GEMINI_API_KEY=your_key");
+    console.error("  1. Export:    export OPENROUTER_API_KEY=your_key");
+    console.error("  2. .env:     Create .env with OPENROUTER_API_KEY=your_key");
     console.error("  3. Flag:     nano-banana \"prompt\" --api-key your_key");
-    console.error("  4. Config:   mkdir -p ~/.nano-banana && echo 'GEMINI_API_KEY=your_key' > ~/.nano-banana/.env");
+    console.error("  4. Config:   mkdir -p ~/.nano-banana && echo 'OPENROUTER_API_KEY=your_key' > ~/.nano-banana/.env");
     console.error("");
-    console.error("Get a key at: https://aistudio.google.com/apikey");
+    console.error("Use GEMINI_API_KEY instead for Google directly.");
+    console.error("Gemini key:     https://aistudio.google.com/apikey");
+    console.error("OpenRouter key: https://openrouter.ai/settings/keys");
     process.exit(1);
   }
 
-  const ai = new GoogleGenAI({ apiKey });
+  const useOpenRouter = apiKey.startsWith("sk-or-");
 
   // Build imageConfig
   const imageConfig: Record<string, string> = {
@@ -519,7 +591,7 @@ async function generateImage(options: Options): Promise<string[]> {
       : modelName;
 
   console.log(`\x1b[36m[nano-banana]\x1b[0m Generating image...`);
-  console.log(`\x1b[90mModel: ${shortName}\x1b[0m`);
+  console.log(`\x1b[90mModel: ${shortName}${useOpenRouter ? " via OpenRouter" : ""}\x1b[0m`);
   console.log(`\x1b[90mPrompt: ${options.prompt}\x1b[0m`);
   console.log(`\x1b[90mSize: ${options.size}${options.aspectRatio ? ` | Aspect: ${options.aspectRatio}` : ""}\x1b[0m`);
 
@@ -556,11 +628,13 @@ async function generateImage(options: Options): Promise<string[]> {
   const contents = [{ role: "user" as const, parts }];
 
   // Use non-streaming to get usageMetadata for cost tracking
-  const response = await ai.models.generateContent({
-    model: modelName,
-    config,
-    contents,
-  });
+  const response: GeminiLikeResponse = useOpenRouter
+    ? await generateViaOpenRouter(apiKey, modelName, parts, imageConfig)
+    : await new GoogleGenAI({ apiKey }).models.generateContent({
+        model: modelName,
+        config,
+        contents,
+      });
 
   const savedFiles: string[] = [];
   let fileIndex = 0;
@@ -598,7 +672,7 @@ async function generateImage(options: Options): Promise<string[]> {
   if (usage) {
     const promptTokens = usage.promptTokenCount || 0;
     const outputTokens = usage.candidatesTokenCount || 0;
-    const cost = calculateCost(modelName, promptTokens, outputTokens);
+    const cost = usage.cost ?? calculateCost(modelName, promptTokens, outputTokens);
 
     console.log(
       `\x1b[90mCost: ~$${cost.toFixed(4)} (${promptTokens} input + ${outputTokens} output tokens)\x1b[0m`
