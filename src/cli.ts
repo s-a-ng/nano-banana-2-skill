@@ -61,6 +61,9 @@ const MODEL_ALIASES: Record<string, string> = {
   nb2: "gemini-3.1-flash-image-preview",
   pro: "gemini-3-pro-image-preview",
   "nb-pro": "gemini-3-pro-image-preview",
+  // OpenRouter only
+  flare: "openai/gpt-image-2.5-flare",
+  sunburst: "openai/gpt-image-2.5-sunburst",
 };
 
 const DEFAULT_MODEL = "gemini-nano-banana-2.1";
@@ -362,7 +365,7 @@ Default: Nano Banana 2.1
   -o, --output      Output filename (without extension) [default: nano-gen-{timestamp}]
   -s, --size        Image size: 512, 1K, 2K, or 4K [default: 1K]
   -a, --aspect      Aspect ratio: 1:1, 16:9, 9:16, 4:3, 3:4, etc. [default: model default]
-  -m, --model       Model: nb2.1, flash/nb2, pro/nb-pro, or any model ID [default: nb2.1]
+  -m, --model       Model: nb2.1, flash/nb2, pro/nb-pro, flare, sunburst, or any model ID [default: nb2.1]
   -d, --dir         Output directory [default: current directory]
   -r, --ref         Reference image(s) - can use multiple times
   -t, --transparent Generate on green screen, then remove background (FFmpeg colorkey + despill)
@@ -374,7 +377,9 @@ Default: Nano Banana 2.1
   nb2.1         Nano Banana 2.1 (default, cheapest, ~$0.034/1K image)
   flash, nb2    Gemini 3.1 Flash Image Preview (fast, cheap)
   pro, nb-pro   Gemini 3 Pro Image Preview (highest quality, 2x cost)
-  <model-id>    Any Gemini model ID (e.g. gemini-2.5-flash-image)
+  flare         GPT Image 2.5 Flare (OpenRouter only, fast)
+  sunburst      GPT Image 2.5 Sunburst (OpenRouter only, detailed)
+  <model-id>    Any Gemini model ID, or any OpenRouter image model (e.g. bytedance-seed/seedream-4.5)
 
 \x1b[33mSizes:\x1b[0m
   512   ~512x512   (~$0.045/image on Flash)
@@ -498,6 +503,10 @@ async function generateViaOpenRouter(
   parts: Array<{ text: string } | { inlineData: { data: string; mimeType: string } }>,
   imageConfig: Record<string, string>
 ): Promise<GeminiLikeResponse> {
+  const id = model.includes("/") ? model : `google/${model}`;
+  // Gemini image models answer on chat completions; the rest (GPT Image, Seedream, ...) need the Images API
+  const useImagesApi = !id.startsWith("google/");
+
   const content = parts.map((p) =>
     "text" in p
       ? { type: "text", text: p.text }
@@ -508,28 +517,47 @@ async function generateViaOpenRouter(
   );
 
   // Google Search grounding is skipped here: OpenRouter bills web search per request
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: model.includes("/") ? model : `google/${model}`,
-      messages: [{ role: "user", content }],
-      modalities: ["image", "text"],
-      image_config: { image_size: imageConfig.imageSize, aspect_ratio: imageConfig.aspectRatio },
-    }),
-  });
+  const body = useImagesApi
+    ? {
+        model: id,
+        prompt: parts.flatMap((p) => ("text" in p ? [p.text] : [])).join("\n"),
+        resolution: imageConfig.imageSize.replace("px", ""),
+        aspect_ratio: imageConfig.aspectRatio,
+        input_references: parts.length > 1 ? content.filter((c) => c.type === "image_url") : undefined,
+      }
+    : {
+        model: id,
+        messages: [{ role: "user", content }],
+        modalities: ["image", "text"],
+        image_config: { image_size: imageConfig.imageSize, aspect_ratio: imageConfig.aspectRatio },
+      };
+
+  const res = await fetch(
+    `https://openrouter.ai/api/v1/${useImagesApi ? "images" : "chat/completions"}`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }
+  );
   if (!res.ok) {
     throw new Error(`OpenRouter ${res.status}: ${await res.text()}`);
   }
 
   const json = await res.json();
-  const message = json.choices?.[0]?.message ?? {};
   const outParts: Array<{ text?: string; inlineData?: { data: string; mimeType: string } }> = [];
-  if (message.content) outParts.push({ text: message.content });
-  for (const img of message.images ?? []) {
-    const match = /^data:([^;]+);base64,(.*)$/s.exec(img.image_url?.url ?? "");
-    if (!match) throw new Error("OpenRouter returned an image that is not a base64 data URL");
-    outParts.push({ inlineData: { mimeType: match[1], data: match[2] } });
+  if (useImagesApi) {
+    for (const img of json.data ?? []) {
+      outParts.push({ inlineData: { mimeType: img.media_type ?? "image/png", data: img.b64_json } });
+    }
+  } else {
+    const message = json.choices?.[0]?.message ?? {};
+    if (message.content) outParts.push({ text: message.content });
+    for (const img of message.images ?? []) {
+      const match = /^data:([^;]+);base64,(.*)$/s.exec(img.image_url?.url ?? "");
+      if (!match) throw new Error("OpenRouter returned an image that is not a base64 data URL");
+      outParts.push({ inlineData: { mimeType: match[1], data: match[2] } });
+    }
   }
 
   return {

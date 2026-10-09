@@ -102,6 +102,7 @@ nano-banana --costs
 | `-d folder` | Where to save (default: current folder) |
 | `-a 16:9` | Aspect ratio (`1:1`, `16:9`, `9:16`, `4:3`, ...) |
 | `-s 2K` | Size: `1K` (default), `2K`, `4K`. Bigger costs more |
+| `-m flare` | Model: `nb2.1` (default, Nano Banana), `flare` / `sunburst` (GPT Image 2.5, cheaper), `pro` |
 | `-r file.png` | Reference image to edit or copy the style of. Repeat for more |
 | `-t` | Transparent background (needs ffmpeg + ImageMagick) |
 | `--costs` | Show how much you've spent |

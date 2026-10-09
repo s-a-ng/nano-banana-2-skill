@@ -53,7 +53,7 @@ Get an OpenRouter key at https://openrouter.ai/settings/keys or a Gemini API key
 | `-o, --output` | `nano-gen-{timestamp}` | Output filename (no extension) |
 | `-s, --size` | `1K` | Image size: `512`, `1K`, `2K`, or `4K` |
 | `-a, --aspect` | model default | Aspect ratio: `1:1`, `16:9`, `9:16`, `4:3`, `3:4`, etc. |
-| `-m, --model` | `nb2.1` | Model: `nb2.1`, `flash`/`nb2`, `pro`/`nb-pro`, or any model ID |
+| `-m, --model` | `nb2.1` | Model: `nb2.1`, `flash`/`nb2`, `pro`/`nb-pro`, `flare`, `sunburst`, or any model ID |
 | `-d, --dir` | current directory | Output directory |
 | `-r, --ref` | - | Reference image (can use multiple times) |
 | `-t, --transparent` | - | Generate on green screen, remove background (FFmpeg) |
@@ -67,6 +67,10 @@ Get an OpenRouter key at https://openrouter.ai/settings/keys or a Gemini API key
 | `nb2.1` | Nano Banana 2.1 | Default. Cheapest (~$0.034/1K, ~$0.050/2K, ~$0.113/4K) |
 | `flash`, `nb2` | Gemini 3.1 Flash | Fast, cheap (~$0.067/1K image) |
 | `pro`, `nb-pro` | Gemini 3 Pro | Highest quality needed (~$0.134/1K image) |
+| `flare` | GPT Image 2.5 Flare | OpenRouter key only. Fast, cheapest (~$0.006-0.016/image) |
+| `sunburst` | GPT Image 2.5 Sunburst | OpenRouter key only. Detail and precision (~$0.006/image) |
+
+With an OpenRouter key, `-m` also accepts any OpenRouter image model ID (e.g. `bytedance-seed/seedream-4.5`).
 
 ## Sizes
 

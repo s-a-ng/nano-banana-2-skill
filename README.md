@@ -85,6 +85,10 @@ nano-banana "your prompt" --model gemini-2.5-flash-image
 | `nb2.1` | Nano Banana 2.1 (default) | Cheapest: ~$0.034/1K, ~$0.050/2K, ~$0.113/4K |
 | `flash`, `nb2` | Gemini 3.1 Flash Image Preview | Speed, cost, high-volume |
 | `pro`, `nb-pro` | Gemini 3 Pro Image Preview | Highest quality, complex composition |
+| `flare` | GPT Image 2.5 Flare (OpenRouter only) | Fast, very cheap (~$0.006-0.016/image) |
+| `sunburst` | GPT Image 2.5 Sunburst (OpenRouter only) | Detail and precision (~$0.006/image) |
+
+With an OpenRouter key, `-m` also takes any OpenRouter image model ID (e.g. `bytedance-seed/seedream-4.5`). Non-Google models go through OpenRouter's Images API.
 
 ### Aspect Ratios
 
@@ -153,7 +157,7 @@ nano-banana "pixel art character, 256x256" -r style.png -r blank-256x256.png -o 
 | `-o, --output` | `nano-gen-{timestamp}` | Output filename (no extension) |
 | `-s, --size` | `1K` | Image size: `512`, `1K`, `2K`, or `4K` |
 | `-a, --aspect` | model default | Aspect ratio: `1:1`, `16:9`, `9:16`, etc. |
-| `-m, --model` | `flash` | Model: `flash`/`nb2`, `pro`/`nb-pro`, or any model ID |
+| `-m, --model` | `nb2.1` | Model: `nb2.1`, `flash`/`nb2`, `pro`/`nb-pro`, `flare`, `sunburst`, or any model ID |
 | `-d, --dir` | current directory | Output directory |
 | `-r, --ref` | - | Reference image (can use multiple times) |
 | `-t, --transparent` | - | Generate on green screen, remove background (FFmpeg) |
